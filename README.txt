@@ -5,23 +5,20 @@
 # steps of making macOS-in-KVM
 #
 # And this README.txt is also a valid bash script, you can run it:
-#   bash /path/to/README.txt
+#   bash /path/to/README.txt [high|moja|cata|big-|mont|vent]
 # after installed kiss-vm: https://github.com/tcler/kiss-vm-ns
 #-------------------------------------------------------------------------------
 
 ## here, we assuming the macOS-kvm-utils directory has been installed to /usr/share
 eval img_download_dir=~/myimages/download
 
-macos_release=high-sierra   #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=mojave        #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=catalina      #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=catalina-bookpro-2013-13inch  #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=catalina-bookpro-2013-15inch  #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=big-sur       #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=monterey      #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-macos_release=ventura       #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
-
-macos_release=catalina      #availables: high-sierra, mojave, catalina, big-sur, monterey, ventura
+pattern=$1
+available_options="high-sierra mojave catalina big-sur monterey ventura sonoma"
+echo "{info} available.options: $available_options"
+if [[ -n "$pattern" ]]; then
+	read macos_release < <(for R in $available_options; do echo "$R" >&2; grep "$pattern" <<<"$R" && break; done)
+fi
+macos_release=${macos_release:-monterey}
 
 macos_vmname=macos-${macos_release}
 macos_image=BaseSystem-mac-$macos_release
@@ -32,6 +29,10 @@ if [[ ! -f $img_download_dir/${macos_image}.img ]]; then
 	command -v dmg2img || { echo "{ERROR} command dmg2img is required."; exit 1; }
 	(cd $img_download_dir; dmg2img -i ${macos_image}.dmg)
 fi
+if [[ ! -f $img_download_dir/${macos_image}.dmg ]]; then
+	echo "{ERROR} download to $img_download_dir/${macos_image}.dmg fail."
+	exit 1
+fi
 
 macos_image_path=$img_download_dir/${macos_image}.img
 
@@ -40,11 +41,14 @@ cpu_vendor=$(awk '/vendor_id/{print $NF; exit}' /proc/cpuinfo)
 case $cpu_vendor in
 *Intel)
 	#verified on host(thindpad-T460P: {CPU: Intel i7-6700HQ, OS: fedora-37}) with all macOS version
-	qemucpu_opt="-cpu host,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2";;
+	qemucpu_opt="-cpu host,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2"
+	;;
 *AMD)
 	#verified on host(deskmini-x300: {CPU: AMD R7-5700G, OS: fedora-36}) with high-sierra,catalina,big-sur
 	#yes, we need emulate Intel CPU on AMD cpu. here we use model: Haswell[2013](or Broadwell[2015]) for better compatible
-	qemucpu_opt="-cpu Haswell,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2";;
+	qemucpu_opt="-cpu Haswell,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2"
+	qemucpu_opt="-cpu Skylake,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2"
+	;;
 esac
 
 #note1: --virt-install-opts=--controller=type=usb,model=none is for avoid controller conflict
